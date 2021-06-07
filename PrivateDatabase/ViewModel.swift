@@ -48,35 +48,28 @@ class ViewModel: ObservableObject {
         let saveOperation = CKModifyRecordsOperation(recordsToSave: [lastPersonRecord])
         saveOperation.savePolicy = .allKeys
 
-        // This completion block will execute once for every record saved. In this sample,
-        // we will only ever be saving a single record, so we only expect this to get called
-        // once.
-        saveOperation.perRecordCompletionBlock = { record, error in
-            os_log("Record with ID \(record.recordID.recordName) was saved.")
+        // This save block will execute once for every record, successful or not.
+        // In this sample, we will only ever be saving a single record, so we only
+        // expect this to get called once.
+        saveOperation.perRecordSaveBlock = { recordID, result in
+            os_log("Record with ID \(recordID.recordName) save completed.")
 
-            if let error = error {
+            if case .failure(let error) = result {
                 self.reportError(error)
             }
 
             self.getLastPerson()
         }
 
-        // This completion block will execute once when the entire CKModifyRecordsOperation
-        // is complete. We'll use it in this sample to see errors, if any. Note that we could
-        // have used this single modifyRecordsCompletionBlock instead of the perRecordCompletionBlock
-        // in this sample and simply parsed the array of records passed in, of which there would
-        // only have been one in this particular sample. In this sample, we are using both for
-        // illustrative purposes.
-        saveOperation.modifyRecordsCompletionBlock = { _, _, error in
-            if let error = error {
+        // This result block will execute once when the entire CKModifyRecordsOperation
+        // is complete. We'll use it in this sample to see operation-wide errors, if any.
+        saveOperation.modifyRecordsResultBlock = { result in
+            if case .failure(let error) = result {
                 self.reportError(error)
-
-                // If a completion was supplied, pass along the error here.
-                completionHandler?(.failure(error))
-            } else {
-                // If a completion was supplied, like during tests, call it back now.
-                completionHandler?(.success(()))
             }
+
+            // If a completion was supplied, pass along the result
+            completionHandler?(result)
         }
 
         database.add(saveOperation)

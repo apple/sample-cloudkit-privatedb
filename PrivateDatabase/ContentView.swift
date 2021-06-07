@@ -19,7 +19,8 @@ struct ContentView: View {
                     .fontWeight(.bold)
                     .foregroundColor(Color.purple) +
                     Text("!")
-                TextField("Enter your own first name here", text: $nameInput, onCommit: { vm.saveRecord(name: nameInput) })
+                TextField("Enter your own first name here", text: $nameInput)
+                    .onSubmit({ vm.saveRecord(name: nameInput) })
                     .textContentType(.givenName)
                     .font(.headline)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
