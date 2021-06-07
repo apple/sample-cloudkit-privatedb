@@ -6,7 +6,8 @@
 import os.log
 import CloudKit
 
-class ViewModel: ObservableObject {
+/// Our class primarily sets properties for the UI, so the entire model is in the MainActor context
+@MainActor class ViewModel: ObservableObject {
 
     // MARK: - Properties
 
@@ -25,10 +26,12 @@ class ViewModel: ObservableObject {
 
     // MARK: - Init
 
-    init(isTesting: Bool = false) {
+    nonisolated init(isTesting: Bool = false) {
         // Use a different unique record ID if testing.
         lastPersonRecordID = CKRecord.ID(recordName: isTesting ? "lastPersonTest" : "lastPerson")
-        getLastPerson()
+        async {
+            try? await self.refreshLastPerson()
+        }
     }
 
     // MARK: - API
@@ -36,89 +39,65 @@ class ViewModel: ObservableObject {
     /// Saves the given name as the last person in the database.
     /// - Parameters:
     ///   - name: Name to attach to the record as the last person.
-    ///   - completionHandler: An optional handler to process completion `success` or `failure`.
-    func saveRecord(name: String, completionHandler: ((Result<Void, Error>) -> Void)? = nil) {
+    func saveRecord(name: String) async throws {
         let lastPersonRecord = CKRecord(recordType: "Person", recordID: lastPersonRecordID)
         lastPersonRecord["name"] = name
 
-        // We'll use a CKModifyRecordsOperation instead of the convenience "save" method
-        // on CKDatabase so that we can customize savePolicy. (For this sample, we'd like
+        let recordResult: Result<CKRecord, Error>
+        // With the CloudKit async API, we can customize savePolicy. (For this sample, we'd like
         // to overwrite the server version of the record in all cases, regardless of what's
         // on the server.
-        let saveOperation = CKModifyRecordsOperation(recordsToSave: [lastPersonRecord])
-        saveOperation.savePolicy = .allKeys
-
-        // This save block will execute once for every record, successful or not.
-        // In this sample, we will only ever be saving a single record, so we only
-        // expect this to get called once.
-        saveOperation.perRecordSaveBlock = { recordID, result in
-            os_log("Record with ID \(recordID.recordName) save completed.")
-
-            if case .failure(let error) = result {
-                self.reportError(error)
-            }
-
-            self.getLastPerson()
+        do {
+            let (saveResults, _) = try await database.modifyRecords(saving: [lastPersonRecord],
+                                                                    savePolicy: .allKeys)
+            // In this sample, we will only ever be saving a single record,
+            // so we only expect one returned result.  We know that if the
+            // function did not throw, we'll have a result for every record
+            // we attempted to save
+            recordResult = saveResults[lastPersonRecordID]!
+        } catch let functionError { // Handle per-function error
+            self.reportError(functionError)
+            // Give callers a chance to handle this error as they like
+            throw functionError
         }
-
-        // This result block will execute once when the entire CKModifyRecordsOperation
-        // is complete. We'll use it in this sample to see operation-wide errors, if any.
-        saveOperation.modifyRecordsResultBlock = { result in
-            if case .failure(let error) = result {
-                self.reportError(error)
-            }
-
-            // If a completion was supplied, pass along the result
-            completionHandler?(result)
+        
+        switch recordResult {
+        case .success(let savedRecord):
+            os_log("Record with ID \(savedRecord.recordID.recordName) was saved.")
+            try await self.refreshLastPerson()
+            
+        case .failure(let recordError): // Handle per-record error
+            self.reportError(recordError)
+            // Give callers a chance to handle this error as they like
+            throw recordError
         }
-
-        database.add(saveOperation)
     }
 
     /// Deletes the last person record.
-    /// - Parameter completionHandler: An optional handler to process completion `success` or `failure`.
-    func deleteLastPerson(completionHandler: ((Result<Void, Error>) -> Void)? = nil) {
-        database.delete(withRecordID: lastPersonRecordID) { recordID, error in
-            if let recordID = recordID {
-                os_log("Record with ID \(recordID.recordName) was deleted.")
-            }
-
-            if let error = error {
-                self.reportError(error)
-
-                // If a completion was supplied, pass along the error here.
-                completionHandler?(.failure(error))
-            } else {
-                // If a completion was supplied, like during tests, call it back now.
-                completionHandler?(.success(()))
-            }
+    func deleteLastPerson() async throws {
+        do {
+            let recordID = try await database.deleteRecord(withID: lastPersonRecordID)
+            os_log("Record with ID \(recordID.recordName) was deleted.")
+        } catch {
+            self.reportError(error)
+            throw error
         }
     }
 
     /// Fetches the last person record and updates the published `lastPerson` property in the VM.
-    /// - Parameter completionHandler: An optional handler to process completion `success` or `failure`.
-    func getLastPerson(completionHandler: ((Result<Void, Error>) -> Void)? = nil) {
-        // Here, we will use the convenience "fetch" method on CKDatabase, instead of
-        // CKFetchRecordsOperation, which is more flexible but also more complex.
-        database.fetch(withRecordID: lastPersonRecordID) { record, error in
-            if let record = record {
-                os_log("Record with ID \(record.recordID.recordName) was fetched.")
-                if let name = record["name"] as? String {
-                    DispatchQueue.main.async {
-                        self.lastPerson = name
-                    }
-                }
+    func refreshLastPerson() async throws {
+        // Here, we will use the convenience async method on CKDatabase
+        // to fetch a single CKRecord
+        do {
+            let record = try await database.record(for: lastPersonRecordID)
+            os_log("Record with ID \(record.recordID.recordName) was fetched.")
+            if let name = record["name"] as? String {
+                self.lastPerson = name
             }
-
-            if let error = error {
-                self.reportError(error)
-
-                // If a completion was supplied, pass along the error here.
-                completionHandler?(.failure(error))
-            } else {
-                // If a completion was supplied, like during tests, call it back now.
-                completionHandler?(.success(()))
-            }
+        } catch {
+            self.reportError(error)
+            // Give callers a chance to handle this error as they like
+            throw error
         }
     }
 

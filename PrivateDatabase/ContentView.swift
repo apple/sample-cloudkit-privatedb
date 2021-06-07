@@ -19,8 +19,9 @@ struct ContentView: View {
                     .fontWeight(.bold)
                     .foregroundColor(Color.purple) +
                     Text("!")
+
                 TextField("Enter your own first name here", text: $nameInput)
-                    .onSubmit({ vm.saveRecord(name: nameInput) })
+                    .onSubmit({ async { try? await vm.saveRecord(name: nameInput) } })
                     .textContentType(.givenName)
                     .font(.headline)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
@@ -32,7 +33,9 @@ struct ContentView: View {
             .navigationTitle("Last Person")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Button(action: { vm.getLastPerson() }, label: {
+                    Button(action: {
+                        async { try? await vm.refreshLastPerson() }
+                    }, label: {
                         Image(systemName: "arrow.clockwise")
                     })
                 }
