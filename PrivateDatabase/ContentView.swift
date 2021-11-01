@@ -21,7 +21,7 @@ struct ContentView: View {
                     Text("!")
 
                 TextField("Enter your own first name here", text: $nameInput)
-                    .onSubmit({ async { try? await vm.saveRecord(name: nameInput) } })
+                    .onSubmit({ Task { try? await vm.saveRecord(name: nameInput) } })
                     .textContentType(.givenName)
                     .font(.headline)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
@@ -34,7 +34,7 @@ struct ContentView: View {
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button(action: {
-                        async { try? await vm.refreshLastPerson() }
+                        Task { try? await vm.refreshLastPerson() }
                     }, label: {
                         Image(systemName: "arrow.clockwise")
                     })

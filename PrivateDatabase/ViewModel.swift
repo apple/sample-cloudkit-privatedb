@@ -29,7 +29,7 @@ import CloudKit
     nonisolated init(isTesting: Bool = false) {
         // Use a different unique record ID if testing.
         lastPersonRecordID = CKRecord.ID(recordName: isTesting ? "lastPersonTest" : "lastPerson")
-        async {
+        Task {
             try? await self.refreshLastPerson()
         }
     }
@@ -49,6 +49,7 @@ import CloudKit
         // on the server.
         do {
             let (saveResults, _) = try await database.modifyRecords(saving: [lastPersonRecord],
+                                                                    deleting: [],
                                                                     savePolicy: .allKeys)
             // In this sample, we will only ever be saving a single record,
             // so we only expect one returned result.  We know that if the
