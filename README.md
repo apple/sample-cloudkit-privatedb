@@ -8,7 +8,7 @@ This buildable (and testable) Xcode project demonstrates a simple use of the Clo
 
 * An [Apple Developer Program membership](https://developer.apple.com/support/compare-memberships/) is needed to create a CloudKit container.
 
-* A Mac with [Xcode 12](https://developer.apple.com/xcode/) (or later) installed is required to build and test this project.
+* A Mac with [Xcode 13](https://developer.apple.com/xcode/) (or later) installed is required to build and test this project.
 
 ## Setup Steps
 
@@ -57,6 +57,10 @@ This buildable (and testable) Xcode project demonstrates a simple use of the Clo
 * Some basic error trapping of `CKError` errors, including those embedded in `partialFailure`
 
 * Some basic testing using `XCTest`
+
+### Note on Swift Concurrency
+
+This project uses Swift concurrency APIs. A prior `completionHandler`-based implementation has been tagged [`pre-async`](https://github.com/apple/cloudkit-sample-privatedb/tree/pre-async).
 
 ## Further Reading
 
